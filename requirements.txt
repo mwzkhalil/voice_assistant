@@ -1,0 +1,38 @@
+# Core framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic>=2.10.0
+pydantic-settings>=2.7.0
+
+# Async WebSocket
+websockets>=14.0
+
+# Redis
+redis[hiredis]>=5.2.0
+
+# LLM client (OpenAI-compatible for Ollama)
+openai>=1.60.0
+
+# ML/AI models
+torch>=2.5.0
+torchaudio>=2.5.0
+transformers>=4.47.0
+accelerate>=1.2.0
+numpy>=1.26.0
+scipy>=1.14.0
+
+# Voice Activity Detection
+webrtcvad>=2.0.10
+
+# Observability
+prometheus-client>=0.21.0
+structlog>=24.4.0
+
+# Async utilities
+uvloop>=0.21.0; sys_platform != "win32"
+httptools>=0.6.0; sys_platform != "win32"
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.24.0
+httpx>=0.28.0

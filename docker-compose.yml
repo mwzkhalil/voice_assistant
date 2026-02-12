@@ -1,0 +1,170 @@
+version: "3.8"
+
+services:
+  # ============================================================
+  # Voice Assistant Application
+  # ============================================================
+  voice-assistant:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: voice-assistant
+    restart: unless-stopped
+    expose:
+      - "8080"
+    ports:
+      - "10000-10100:10000-10100/udp"  # RTP range (ARI mode only)
+    environment:
+      # Server
+      SERVER_HOST: "0.0.0.0"
+      SERVER_PORT: "8080"
+      SERVER_WORKERS: "1"
+      SERVER_LOG_LEVEL: "INFO"
+      SERVER_DEBUG: "false"
+      SERVER_MAX_CONCURRENT_CALLS: "200"
+
+      # Transport mode: WS (default) or ARI
+      SERVER_TRANSPORT_MODE: "${TRANSPORT_MODE:-WS}"
+
+      # Authentication
+      AUTH_ENABLED: "${AUTH_ENABLED:-true}"
+      AUTH_API_KEYS: "${AUTH_API_KEYS:-}"
+      AUTH_RATE_LIMIT_PER_MINUTE: "60"
+      AUTH_MAX_SESSIONS_PER_IP: "5"
+      AUTH_MAX_AUDIO_DURATION_SECONDS: "600"
+      AUTH_MAX_CHUNK_SIZE_BYTES: "32768"
+      AUTH_IDLE_SESSION_TIMEOUT: "300"
+
+      # Asterisk ARI (only used in ARI mode)
+      ARI_HOST: "${ARI_HOST:-asterisk}"
+      ARI_PORT: "8088"
+      ARI_WS_PORT: "8088"
+      ARI_USERNAME: "${ARI_USERNAME:-asterisk}"
+      ARI_PASSWORD: "${ARI_PASSWORD:-asterisk}"
+      ARI_APP_NAME: "voice-assistant"
+
+      # Redis
+      REDIS_URL: "redis://redis:6379/0"
+      REDIS_POOL_MAX_SIZE: "20"
+
+      # Ollama LLM
+      OLLAMA_BASE_URL: "${OLLAMA_BASE_URL:-http://host.docker.internal:11434/v1}"
+      OLLAMA_MODEL_NAME: "mahwiz/zoma"
+      OLLAMA_MAX_TOKENS: "512"
+      OLLAMA_REQUEST_TIMEOUT: "30"
+
+      # ASR
+      ASR_MODEL_NAME: "sajadkawa/ns_finetune_urdu_asr_org"
+      ASR_DEVICE: "auto"
+      ASR_SAMPLE_RATE: "16000"
+
+      # TTS
+      TTS_MODEL_NAME: "suhaibrashid17/MMS_TTS_Urdu_3"
+      TTS_DEVICE: "auto"
+      TTS_OUTPUT_SAMPLE_RATE: "16000"
+
+      # VAD
+      VAD_AGGRESSIVENESS: "2"
+      VAD_SILENCE_THRESHOLD_MS: "800"
+
+      # RTP (ARI mode only)
+      RTP_LISTEN_HOST: "0.0.0.0"
+      RTP_PORT_RANGE_START: "10000"
+      RTP_PORT_RANGE_END: "10100"
+      RTP_CODEC: "ulaw"
+
+      # HuggingFace cache
+      HF_HOME: "/app/.cache/huggingface"
+      TRANSFORMERS_CACHE: "/app/.cache/huggingface"
+
+    volumes:
+      - model-cache:/app/.cache/huggingface
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - voice-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+        limits:
+          memory: 8G
+          cpus: "4.0"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 120s
+      retries: 3
+
+  # ============================================================
+  # Redis - Session Store & Distributed Locking
+  # ============================================================
+  redis:
+    image: redis:7-alpine
+    container_name: voice-assistant-redis
+    restart: unless-stopped
+    expose:
+      - "6379"
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 60 1000
+      --loglevel warning
+      --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - voice-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+
+  # ============================================================
+  # Nginx - Reverse Proxy, TLS Termination, Rate Limiting
+  # ============================================================
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: voice-assistant-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - certbot-webroot:/var/www/certbot:ro
+    depends_on:
+      voice-assistant:
+        condition: service_healthy
+    networks:
+      - voice-net
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.5"
+
+volumes:
+  redis-data:
+    driver: local
+  model-cache:
+    driver: local
+  certbot-webroot:
+    driver: local
+
+networks:
+  voice-net:
+    driver: bridge
