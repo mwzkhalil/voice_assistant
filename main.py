@@ -40,7 +40,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Voice Assistant (Urdu)",
         description=(
-            "Enterprise-grade Urdu voice assistant with Asterisk ARI integration, "
+            "-grade Urdu voice assistant with Asterisk ARI integration, "
             "real-time ASR/LLM/TTS streaming pipeline."
         ),
         version="1.0.0",

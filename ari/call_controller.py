@@ -65,7 +65,7 @@ class ActiveCall:
 
 class CallController:
     """
-    Enterprise call lifecycle controller.
+     call lifecycle controller.
 
     Handles:
     - Incoming call setup (answer, ExternalMedia, bridge, pipeline start)

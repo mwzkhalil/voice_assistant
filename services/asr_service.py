@@ -29,7 +29,7 @@ logger = get_logger(__name__)
 
 class ASRService:
     """
-    Enterprise ASR service with chunked windowed inference.
+     ASR service with chunked windowed inference.
 
     Loads a HuggingFace ASR model (auto-detects Wav2Vec2 CTC or Whisper)
     at startup and runs inference in a thread pool to keep the event
@@ -215,7 +215,7 @@ class ASRService:
                 # Whisper / seq2seq
                 generated_ids = self._model.generate(
                     input_dict.get("input_features", input_dict.get("input_values")),
-                    max_new_tokens=448,
+                    max_new_tokens=128,
                 )
                 transcription = self._processor.batch_decode(
                     generated_ids, skip_special_tokens=True

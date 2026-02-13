@@ -1,5 +1,5 @@
 """
-Enterprise structured logging via structlog.
+ structured logging via structlog.
 
 JSON-formatted output with correlation IDs, log levels, and caller information.
 No print statements allowed anywhere in the codebase.

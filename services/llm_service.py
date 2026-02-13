@@ -113,7 +113,7 @@ def sanitize_input(text: str) -> str:
 
 class LLMService:
     """
-    Enterprise LLM service with streaming, circuit breaker, and retry.
+     LLM service with streaming, circuit breaker, and retry.
 
     Streams tokens from Ollama's OpenAI-compatible API endpoint.
     Always injects Urdu system prompt. Enforces token limits and timeouts.

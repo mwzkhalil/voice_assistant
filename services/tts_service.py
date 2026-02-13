@@ -28,7 +28,7 @@ logger = get_logger(__name__)
 
 class TTSService:
     """
-    Enterprise TTS service with sentence-level streaming synthesis.
+     TTS service with sentence-level streaming synthesis.
 
     Loads a VITS/MMS model at startup on GPU/CPU. Synthesizes text
     chunks from an asyncio queue and yields raw PCM audio bytes.

@@ -95,7 +95,7 @@ class CallSession(BaseModel):
 
 class SessionManager:
     """
-    Enterprise session manager with Redis persistence and distributed locking.
+     session manager with Redis persistence and distributed locking.
 
     Manages call session lifecycle with strict state machine enforcement.
     All state transitions are validated and locked to prevent race conditions.

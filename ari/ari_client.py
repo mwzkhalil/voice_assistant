@@ -26,7 +26,7 @@ logger = get_logger(__name__)
 
 class ARIClient:
     """
-    Enterprise ARI WebSocket client with auto-reconnect.
+     ARI WebSocket client with auto-reconnect.
 
     Maintains a persistent WebSocket connection to Asterisk ARI.
     Supports receiving events and sending REST commands over the

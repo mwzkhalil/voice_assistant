@@ -34,7 +34,7 @@ This system is a real-time, streaming Urdu voice assistant designed for telecom 
 - **Circuit breaker.** The LLM service implements a three-state circuit breaker (CLOSED, OPEN, HALF_OPEN) with configurable failure threshold and recovery timeout to prevent cascading failures.
 - **No closed-source API dependencies.** All models (ASR, LLM, TTS) run locally on GPU. The LLM is served via Ollama.
 
-### Enterprise Constraints
+###  Constraints
 
 - Python 3.11+ required
 - AsyncIO only, no synchronous blocking calls anywhere

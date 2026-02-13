@@ -194,7 +194,7 @@
 </head>
 <body>
     <h1>Voice Assistant - Urdu</h1>
-    <p class="subtitle">Enterprise Realtime Streaming Client</p>
+    <p class="subtitle"> Realtime Streaming Client</p>
 
     <div class="config-panel">
         <label for="wsUrl">WebSocket URL</label>
@@ -292,7 +292,7 @@
 
             // Use ScriptProcessorNode for raw PCM access
             scriptProcessor = audioContext.createScriptProcessor(
-                FRAME_SIZE, 1, 1
+                1024, 1, 1
             );
 
             scriptProcessor.onaudioprocess = (e) => {

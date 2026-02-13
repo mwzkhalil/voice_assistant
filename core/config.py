@@ -1,5 +1,5 @@
 """
-Enterprise configuration management via Pydantic BaseSettings.
+ configuration management via Pydantic BaseSettings.
 
 All configuration is sourced from environment variables with validated defaults.
 No hardcoded credentials. Supports .env file loading.
