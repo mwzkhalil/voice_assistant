@@ -233,7 +233,8 @@ class ASRService:
 
         Reads raw PCM 16-bit bytes from the queue, accumulates into
         chunks of configured duration, runs inference, and yields
-        transcription results.
+        transcription results. Optimized for real-time processing
+        with non-blocking queue consumption.
 
         Args:
             audio_queue: Queue of raw PCM 16-bit audio bytes. None signals end.
@@ -248,23 +249,60 @@ class ASRService:
         max_buffer_samples = int(sample_rate * self._settings.max_audio_buffer_seconds)
 
         audio_buffer = np.array([], dtype=np.float32)
+        frames_received = 0
+        chunks_transcribed = 0
+
+        logger.debug(
+            "asr_stream_start",
+            chunk_samples=chunk_samples,
+            overlap_samples=overlap_samples,
+        )
 
         while not cancel_event.is_set():
+            # Use shorter timeout to be more responsive to queue state
             try:
-                raw_bytes = await asyncio.wait_for(audio_queue.get(), timeout=5.0)
+                raw_bytes = await asyncio.wait_for(audio_queue.get(), timeout=1.0)
             except asyncio.TimeoutError:
+                # Check if we have accumulated audio to process even without new input
+                if len(audio_buffer) >= chunk_samples:
+                    chunk = audio_buffer[:chunk_samples]
+                    audio_buffer = audio_buffer[chunk_samples - overlap_samples:]
+                    try:
+                        text = await self.transcribe_chunk(chunk)
+                        if text:
+                            chunks_transcribed += 1
+                            logger.debug(
+                                "asr_chunk_transcribed",
+                                text=text[:50],
+                                buffer_size=len(audio_buffer),
+                            )
+                            yield text
+                    except ASRError:
+                        logger.exception("asr_chunk_error")
                 continue
 
             if raw_bytes is None:
                 # End of stream - transcribe remaining buffer
+                logger.debug(
+                    "asr_stream_end",
+                    frames_received=frames_received,
+                    chunks_transcribed=chunks_transcribed,
+                    buffer_size=len(audio_buffer),
+                )
                 if len(audio_buffer) > sample_rate * 0.3:  # at least 300ms
                     try:
                         text = await self.transcribe_chunk(audio_buffer)
                         if text:
+                            logger.info(
+                                "asr_final_transcription",
+                                text=text,
+                            )
                             yield text
                     except ASRError:
                         logger.exception("asr_final_chunk_error")
                 break
+
+            frames_received += 1
 
             # Convert bytes to float32 numpy array
             pcm_16bit = np.frombuffer(raw_bytes, dtype=np.int16)
@@ -276,8 +314,13 @@ class ASRService:
 
             audio_buffer = np.concatenate([audio_buffer, audio_float])
 
-            # Enforce max buffer size
+            # Enforce max buffer size (drop oldest if exceeded)
             if len(audio_buffer) > max_buffer_samples:
+                logger.warning(
+                    "asr_buffer_overflow",
+                    buffer_size=len(audio_buffer),
+                    max_size=max_buffer_samples,
+                )
                 audio_buffer = audio_buffer[-max_buffer_samples:]
 
             # Process when we have enough audio
@@ -289,6 +332,13 @@ class ASRService:
                 try:
                     text = await self.transcribe_chunk(chunk)
                     if text:
+                        chunks_transcribed += 1
+                        logger.debug(
+                            "asr_chunk_transcribed",
+                            text=text[:50],
+                            queue_size=audio_queue.qsize(),
+                            buffer_size=len(audio_buffer),
+                        )
                         yield text
                 except ASRError:
                     logger.exception("asr_chunk_error")

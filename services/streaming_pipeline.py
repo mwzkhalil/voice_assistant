@@ -36,10 +36,14 @@ logger = get_logger(__name__)
 STREAM_END: None = None
 
 # Queue sizes for backpressure
-ASR_AUDIO_QUEUE_SIZE = 100    # ~3 seconds at 30ms frames
+ASR_AUDIO_QUEUE_SIZE = 200    # ~6 seconds at 30ms frames (increased for real-time safety)
 ASR_TEXT_QUEUE_SIZE = 10
 LLM_TEXT_QUEUE_SIZE = 50
 TTS_AUDIO_QUEUE_SIZE = 20
+
+# Backpressure thresholds (as fraction of queue size)
+ASR_QUEUE_WARNING_THRESHOLD = 0.7  # Warn when 70% full
+ASR_QUEUE_BACKPRESSURE_THRESHOLD = 0.8  # Apply backpressure when 80% full
 
 
 class StreamingPipeline:
@@ -227,9 +231,13 @@ class StreamingPipeline:
 
         Reads PCM audio from the transport (RTP or WebSocket), runs
         frame-level VAD, and routes audio frames to the ASR queue.
+        Implements backpressure and FIFO drop strategy to prevent overflow.
         """
         assert self._vad_tracker is not None
         frame_size = self._vad_service.frame_size_bytes
+        chunks_enqueued = 0
+        chunks_dropped = 0
+        last_queue_log = time.monotonic()
 
         while not self._cancel_event.is_set():
             try:
@@ -258,20 +266,85 @@ class StreamingPipeline:
                 await self.interrupt()
                 continue
 
-            # Feed audio to ASR when speech detected
+            # Feed audio to ASR when speech detected (VAD filtering prevents silent frames)
+            # Only enqueue frames when VAD detects speech, preventing silent frame flooding
             if vad_result.should_trigger_asr:
+                queue_size = self._asr_audio_queue.qsize()
+                queue_fill_ratio = queue_size / ASR_AUDIO_QUEUE_SIZE
+
+                # Apply backpressure: throttle ingestion when queue is getting full
+                if queue_fill_ratio >= ASR_QUEUE_BACKPRESSURE_THRESHOLD:
+                    # Throttle ingestion to allow ASR to catch up
+                    await asyncio.sleep(0.01)  # 10ms throttle
+                    
+                    # If still full after throttle, implement FIFO drop strategy
+                    if self._asr_audio_queue.full():
+                        try:
+                            # Drop oldest chunk (FIFO) to make room
+                            _ = self._asr_audio_queue.get_nowait()
+                            chunks_dropped += 1
+                            logger.debug(
+                                "asr_queue_fifo_drop",
+                                call_id=self._call_id,
+                                queue_size=queue_size,
+                            )
+                        except asyncio.QueueEmpty:
+                            pass
+
+                # Log queue state periodically (every 2 seconds)
+                now = time.monotonic()
+                if now - last_queue_log >= 2.0:
+                    logger.info(
+                        "asr_queue_state",
+                        call_id=self._call_id,
+                        queue_size=queue_size,
+                        queue_fill_ratio=f"{queue_fill_ratio:.2%}",
+                        chunks_enqueued=chunks_enqueued,
+                        chunks_dropped=chunks_dropped,
+                    )
+                    last_queue_log = now
+
+                # Enqueue the frame
                 try:
                     self._asr_audio_queue.put_nowait(pcm_frame)
+                    chunks_enqueued += 1
                 except asyncio.QueueFull:
-                    logger.warning("asr_audio_queue_full", call_id=self._call_id)
+                    # Final fallback: drop oldest if still full
+                    try:
+                        _ = self._asr_audio_queue.get_nowait()
+                        self._asr_audio_queue.put_nowait(pcm_frame)
+                        chunks_enqueued += 1
+                        chunks_dropped += 1
+                        logger.warning(
+                            "asr_queue_overflow_fifo_drop",
+                            call_id=self._call_id,
+                            queue_size=queue_size,
+                        )
+                    except asyncio.QueueEmpty:
+                        logger.error(
+                            "asr_queue_critical_overflow",
+                            call_id=self._call_id,
+                            queue_size=queue_size,
+                        )
 
             # End of utterance - finalize ASR
             if vad_result.should_finalize:
                 self._speech_end_time = time.monotonic()
+                logger.info(
+                    "asr_utterance_end",
+                    call_id=self._call_id,
+                    chunks_enqueued=chunks_enqueued,
+                    chunks_dropped=chunks_dropped,
+                )
                 try:
                     self._asr_audio_queue.put_nowait(STREAM_END)
                 except asyncio.QueueFull:
-                    pass
+                    # Force enqueue STREAM_END by dropping oldest if needed
+                    try:
+                        _ = self._asr_audio_queue.get_nowait()
+                        self._asr_audio_queue.put_nowait(STREAM_END)
+                    except asyncio.QueueEmpty:
+                        pass
 
                 # Transition to THINKING
                 try:
@@ -284,13 +357,30 @@ class StreamingPipeline:
                         call_id=self._call_id,
                         target="THINKING",
                     )
+                
+                # Reset counters for next utterance
+                chunks_enqueued = 0
+                chunks_dropped = 0
 
     async def _asr_loop(self) -> None:
         """
         Stage 2: Run ASR on audio chunks and produce transcripts.
+        
+        Continuously processes audio from the queue in a dedicated async task.
+        Ensures queue is consumed efficiently to prevent overflow.
         """
+        chunks_processed = 0
+        last_processing_log = time.monotonic()
+
         while not self._cancel_event.is_set():
             transcript_parts: list[str] = []
+            processing_start = time.monotonic()
+
+            logger.debug(
+                "asr_processing_start",
+                call_id=self._call_id,
+                queue_size=self._asr_audio_queue.qsize(),
+            )
 
             async for text in self._asr.transcribe_stream(
                 self._asr_audio_queue, self._cancel_event
@@ -298,14 +388,18 @@ class StreamingPipeline:
                 if self._cancel_event.is_set():
                     break
                 transcript_parts.append(text)
+                chunks_processed += 1
                 logger.debug(
                     "asr_partial_transcript",
                     call_id=self._call_id,
                     text=text,
+                    queue_size=self._asr_audio_queue.qsize(),
                 )
 
             if self._cancel_event.is_set():
                 break
+
+            processing_duration = time.monotonic() - processing_start
 
             # Combine partial transcripts into final
             full_transcript = " ".join(transcript_parts).strip()
@@ -314,6 +408,8 @@ class StreamingPipeline:
                     "asr_final_transcript",
                     call_id=self._call_id,
                     text=full_transcript,
+                    processing_duration_seconds=processing_duration,
+                    chunks_processed=chunks_processed,
                 )
 
                 # Store user message in session
@@ -327,11 +423,40 @@ class StreamingPipeline:
                 # Forward to LLM
                 try:
                     self._asr_text_queue.put_nowait(full_transcript)
+                    logger.debug(
+                        "asr_transcript_forwarded_to_llm",
+                        call_id=self._call_id,
+                        text=full_transcript[:50],  # Log first 50 chars
+                    )
                 except asyncio.QueueFull:
-                    logger.warning("asr_text_queue_full", call_id=self._call_id)
+                    logger.warning(
+                        "asr_text_queue_full",
+                        call_id=self._call_id,
+                        queue_size=self._asr_text_queue.qsize(),
+                    )
+                    # Force enqueue by waiting (non-blocking queue is full)
+                    await self._asr_text_queue.put(full_transcript)
+            else:
+                logger.warning(
+                    "asr_empty_transcript",
+                    call_id=self._call_id,
+                    processing_duration_seconds=processing_duration,
+                )
+
+            # Log processing rate periodically
+            now = time.monotonic()
+            if now - last_processing_log >= 5.0:
+                logger.info(
+                    "asr_processing_stats",
+                    call_id=self._call_id,
+                    chunks_processed=chunks_processed,
+                    queue_size=self._asr_audio_queue.qsize(),
+                )
+                last_processing_log = now
 
             # Re-create ASR audio queue for next utterance
             self._asr_audio_queue = asyncio.Queue(maxsize=ASR_AUDIO_QUEUE_SIZE)
+            chunks_processed = 0
 
     async def _llm_loop(self) -> None:
         """
