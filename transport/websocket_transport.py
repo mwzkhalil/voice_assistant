@@ -54,7 +54,7 @@ class WebSocketTransport(AudioTransport):
         self._idle_timeout = idle_timeout
 
         # Inbound PCM queue (client -> pipeline)
-        self._inbound_queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=200)
+        self._inbound_queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=500)
         # Outbound PCM queue (pipeline -> client)
         self._outbound_queue: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=100)
 
@@ -123,16 +123,12 @@ class WebSocketTransport(AudioTransport):
             pcm = await asyncio.wait_for(
                 self._inbound_queue.get(), timeout=2.0
             )
-            # Pad or trim to expected frame size
+            # Frames are pre-split to frame_size in _receive_loop,
+            # but guard here just in case.
             if len(pcm) < frame_size:
                 pcm = pcm + b'\x00' * (frame_size - len(pcm))
             elif len(pcm) > frame_size:
-                remainder = pcm[frame_size:]
                 pcm = pcm[:frame_size]
-                try:
-                    self._inbound_queue.put_nowait(remainder)
-                except asyncio.QueueFull:
-                    pass
             return pcm
         except asyncio.TimeoutError:
             return None
@@ -248,10 +244,21 @@ class WebSocketTransport(AudioTransport):
 
                 RTP_PACKETS_RECEIVED.inc()
 
-                try:
-                    self._inbound_queue.put_nowait(pcm_bytes)
-                except asyncio.QueueFull:
-                    RTP_PACKETS_DROPPED.labels(reason="ws_inbound_full").inc()
+                # Split incoming chunk into VAD-sized frames and queue each
+                # separately. This prevents remainder-drop races and ensures
+                # the pipeline always gets clean same-size frames.
+                FRAME = 960  # 30 ms × 16 kHz × 2 bytes
+                pos = 0
+                while pos < len(pcm_bytes):
+                    frame = pcm_bytes[pos:pos + FRAME]
+                    if len(frame) < FRAME:
+                        frame = frame + b'\x00' * (FRAME - len(frame))
+                    try:
+                        self._inbound_queue.put_nowait(frame)
+                    except asyncio.QueueFull:
+                        RTP_PACKETS_DROPPED.labels(reason="ws_inbound_full").inc()
+                        break  # drop rest of this chunk, not all future chunks
+                    pos += FRAME
 
             elif msg_type == "ping":
                 try:

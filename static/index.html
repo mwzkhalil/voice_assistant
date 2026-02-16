@@ -4,207 +4,277 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Voice Assistant - Realtime Client</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+        :root {
+            --bg:        #080d14;
+            --surface:   #0e1620;
+            --border:    #1a2740;
+            --accent:    #00d4ff;
+            --green:     #00ff9d;
+            --amber:     #ffb700;
+            --violet:    #b57bff;
+            --red:       #ff4d6a;
+            --text:      #c9d8ef;
+            --muted:     #3d5270;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #0f172a;
-            color: #e2e8f0;
+            font-family: 'IBM Plex Mono', monospace;
+            background: var(--bg);
+            color: var(--text);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 2rem;
+            padding: 2rem 1rem 3rem;
+            background-image:
+                radial-gradient(ellipse 60% 40% at 50% 0%, #0d2040 0%, transparent 70%),
+                repeating-linear-gradient(0deg, transparent, transparent 39px, var(--border) 39px, var(--border) 40px),
+                repeating-linear-gradient(90deg, transparent, transparent 39px, var(--border) 39px, var(--border) 40px);
         }
 
-        h1 {
-            font-size: 1.5rem;
-            margin-bottom: 0.5rem;
-            color: #38bdf8;
-        }
-
-        .subtitle {
-            font-size: 0.85rem;
-            color: #64748b;
+        /* ── Header ── */
+        header {
+            text-align: center;
             margin-bottom: 2rem;
         }
 
-        .config-panel {
-            width: 100%;
-            max-width: 600px;
-            background: #1e293b;
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
+        header h1 {
+            font-family: 'Noto Nastaliq Urdu', serif;
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: -0.5px;
+            text-shadow: 0 0 24px rgba(0,212,255,0.35);
         }
 
+        header .subtitle {
+            font-size: 0.72rem;
+            color: var(--muted);
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            margin-top: 0.4rem;
+        }
+
+        /* ── Card wrapper ── */
+        .card {
+            width: 100%;
+            max-width: 620px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.4rem 1.6rem;
+            margin-bottom: 1.2rem;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+        }
+
+        /* ── Config ── */
         .config-panel label {
             display: block;
-            font-size: 0.8rem;
-            color: #94a3b8;
-            margin-bottom: 0.25rem;
+            font-size: 0.72rem;
+            color: var(--muted);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            margin-bottom: 0.3rem;
         }
 
         .config-panel input {
             width: 100%;
-            padding: 0.5rem 0.75rem;
-            background: #0f172a;
-            border: 1px solid #334155;
+            padding: 0.55rem 0.85rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
             border-radius: 6px;
-            color: #e2e8f0;
-            font-size: 0.9rem;
-            margin-bottom: 0.75rem;
+            color: var(--text);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.85rem;
+            margin-bottom: 0.9rem;
+            transition: border-color 0.2s;
         }
 
         .config-panel input:focus {
             outline: none;
-            border-color: #38bdf8;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(0,212,255,0.12);
         }
 
+        /* ── Buttons ── */
         .controls {
             display: flex;
-            gap: 1rem;
+            gap: 0.9rem;
             justify-content: center;
-            margin-bottom: 2rem;
+            margin-bottom: 1.2rem;
         }
 
         button {
-            padding: 0.75rem 2rem;
-            border: none;
+            padding: 0.7rem 2rem;
+            border: 1px solid transparent;
             border-radius: 8px;
-            font-size: 1rem;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.88rem;
             font-weight: 600;
+            letter-spacing: 0.06em;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.18s;
+            position: relative;
+            overflow: hidden;
         }
 
+        button::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0);
+            transition: background 0.15s;
+        }
+
+        button:hover:not(:disabled)::after { background: rgba(255,255,255,0.07); }
+        button:active:not(:disabled)::after { background: rgba(255,255,255,0.14); }
+
         button:disabled {
-            opacity: 0.4;
+            opacity: 0.35;
             cursor: not-allowed;
         }
 
         #btnConnect {
-            background: #22c55e;
-            color: #0f172a;
-        }
-
-        #btnConnect:hover:not(:disabled) {
-            background: #16a34a;
+            background: var(--green);
+            color: #080d14;
+            border-color: var(--green);
+            box-shadow: 0 0 18px rgba(0,255,157,0.25);
         }
 
         #btnDisconnect {
-            background: #ef4444;
-            color: white;
+            background: transparent;
+            color: var(--red);
+            border-color: var(--red);
         }
 
         #btnDisconnect:hover:not(:disabled) {
-            background: #dc2626;
+            background: rgba(255,77,106,0.12);
         }
 
+        /* ── Status bar ── */
         .status-bar {
             width: 100%;
-            max-width: 600px;
+            max-width: 620px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.75rem 1rem;
-            background: #1e293b;
+            padding: 0.65rem 1.1rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
             border-radius: 8px;
-            margin-bottom: 1.5rem;
-            font-size: 0.85rem;
+            margin-bottom: 1.2rem;
+            font-size: 0.78rem;
         }
 
         .status-indicator {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.6rem;
         }
 
         .status-dot {
-            width: 10px;
-            height: 10px;
+            width: 9px;
+            height: 9px;
             border-radius: 50%;
-            background: #64748b;
+            background: var(--muted);
+            flex-shrink: 0;
         }
 
-        .status-dot.connected { background: #22c55e; }
-        .status-dot.listening { background: #38bdf8; animation: pulse 1.5s infinite; }
-        .status-dot.speaking  { background: #f59e0b; animation: pulse 0.8s infinite; }
-        .status-dot.thinking  { background: #a78bfa; animation: pulse 1s infinite; }
-        .status-dot.error     { background: #ef4444; }
+        .status-dot.connected   { background: var(--green); }
+        .status-dot.listening   { background: var(--accent);  animation: pulse 1.5s infinite; }
+        .status-dot.speaking    { background: var(--amber);   animation: pulse 0.75s infinite; }
+        .status-dot.thinking    { background: var(--violet);  animation: pulse 1.0s infinite; }
+        .status-dot.error       { background: var(--red); }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 currentColor; }
+            50%       { opacity: 0.5; }
         }
 
+        #sessionInfo { color: var(--muted); font-size: 0.72rem; }
+
+        /* ── Visualizer ── */
         .visualizer {
             width: 100%;
-            max-width: 600px;
-            height: 80px;
-            background: #1e293b;
+            max-width: 620px;
+            height: 72px;
+            background: var(--surface);
+            border: 1px solid var(--border);
             border-radius: 8px;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.2rem;
             overflow: hidden;
         }
 
-        .visualizer canvas {
-            width: 100%;
-            height: 100%;
-        }
+        .visualizer canvas { display: block; width: 100%; height: 100%; }
 
+        /* ── Transcript ── */
         .transcript-panel {
             width: 100%;
-            max-width: 600px;
-            background: #1e293b;
+            max-width: 620px;
+            background: var(--surface);
+            border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 1.5rem;
+            padding: 1.2rem 1.5rem;
             min-height: 200px;
-            max-height: 400px;
+            max-height: 380px;
             overflow-y: auto;
+            scroll-behavior: smooth;
         }
 
+        .transcript-panel::-webkit-scrollbar { width: 4px; }
+        .transcript-panel::-webkit-scrollbar-track { background: transparent; }
+        .transcript-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
         .transcript-panel h3 {
-            font-size: 0.9rem;
-            color: #94a3b8;
+            font-size: 0.72rem;
+            color: var(--muted);
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
             margin-bottom: 1rem;
-            border-bottom: 1px solid #334155;
+            border-bottom: 1px solid var(--border);
             padding-bottom: 0.5rem;
         }
 
         .message {
-            padding: 0.5rem 0;
-            font-size: 0.9rem;
-            line-height: 1.5;
-            border-bottom: 1px solid #1e293b;
+            padding: 0.45rem 0;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
         }
 
-        .message.user { color: #38bdf8; }
-        .message.assistant { color: #22c55e; }
-        .message.system { color: #64748b; font-style: italic; font-size: 0.8rem; }
-        .message.error { color: #ef4444; }
+        .message.user      { color: var(--accent); }
+        .message.assistant { color: var(--green); }
+        .message.system    { color: var(--muted); font-style: italic; font-size: 0.76rem; }
+        .message.error     { color: var(--red); }
 
         .message .role {
             font-weight: 600;
             display: inline-block;
-            min-width: 70px;
+            min-width: 72px;
+            opacity: 0.75;
         }
     </style>
 </head>
 <body>
-    <h1>Voice Assistant - Urdu</h1>
-    <p class="subtitle"> Realtime Streaming Client</p>
+    <header>
+        <h1>آواز معاون</h1>
+        <p class="subtitle">Realtime Streaming Client</p>
+    </header>
 
-    <div class="config-panel">
+    <div class="card config-panel">
         <label for="wsUrl">WebSocket URL</label>
-        <input type="text" id="wsUrl" value="" placeholder="wss://yourdomain.com/ws/realtime?api_key=YOUR_KEY">
+        <input type="text" id="wsUrl" placeholder="wss://yourdomain.com/ws/realtime">
         <label for="apiKey">API Key</label>
-        <input type="text" id="apiKey" value="" placeholder="Enter API key">
+        <input type="password" id="apiKey" placeholder="Enter API key">
     </div>
 
     <div class="controls">
-        <button id="btnConnect" onclick="connect()">Connect & Start</button>
+        <button id="btnConnect"    onclick="connect()">Connect &amp; Start</button>
         <button id="btnDisconnect" onclick="disconnect()" disabled>Disconnect</button>
     </div>
 
@@ -216,304 +286,513 @@
         <span id="sessionInfo"></span>
     </div>
 
-    <div class="visualizer">
-        <canvas id="visualizer"></canvas>
-    </div>
+    <div class="visualizer"><canvas id="visualizer"></canvas></div>
 
     <div class="transcript-panel" id="transcripts">
         <h3>Conversation</h3>
     </div>
 
     <script>
-        // =====================================================================
-        // Configuration
-        // =====================================================================
-        const SAMPLE_RATE = 16000;
-        const FRAME_DURATION_MS = 30;
-        const FRAME_SIZE = SAMPLE_RATE * FRAME_DURATION_MS / 1000;
+    // =========================================================================
+    // Constants
+    // =========================================================================
+    const CAPTURE_SAMPLE_RATE   = 16000;   // must match server
+    const PLAYBACK_SAMPLE_RATE  = 24000;   // server TTS output rate (adjust if needed)
+    // ScriptProcessorNode buffer must be a power-of-two: 256 … 16384
+    // 4096 @ 16 kHz ≈ 256 ms — comfortable latency without drop-outs
+    const SP_BUFFER_SIZE        = 4096;
+    // Accumulate this many 16 kHz samples before sending one WS frame.
+    // 3200 = 200 ms — prevents asr_audio_queue_full flooding the server.
+    const SEND_CHUNK_SAMPLES    = 3200;
 
-        // =====================================================================
-        // State
-        // =====================================================================
-        let ws = null;
-        let audioContext = null;
-        let mediaStream = null;
-        let scriptProcessor = null;
-        let playbackQueue = [];
-        let isPlaying = false;
-        let state = 'disconnected';
+    // =========================================================================
+    // State  (all mutable state lives here — no stray globals)
+    // =========================================================================
+    const S = {
+        ws:             null,
+        captureCtx:     null,   // AudioContext for mic
+        playbackCtx:    null,   // AudioContext for speaker
+        mediaStream:    null,
+        sourceNode:     null,
+        spNode:         null,   // ScriptProcessorNode
+        sendBuf:        [],     // accumulates resampled 16 kHz float32 chunks
+        sendBufLen:     0,      // total samples in sendBuf
+        playQueue:      [],     // Float32Array chunks waiting to play
+        playScheduleAt: 0,      // audioContext.currentTime cursor for gapless queue
+        uiState:        'disconnected',
+        visualRaf:      null,
+        cleanupInFlight:false,  // guard against double-cleanup
+    };
 
-        // Auto-detect WebSocket URL
-        (function() {
-            const loc = window.location;
-            const proto = loc.protocol === 'https:' ? 'wss:' : 'ws:';
-            document.getElementById('wsUrl').value = `${proto}//${loc.host}/ws/realtime`;
-        })();
+    // =========================================================================
+    // Boot
+    // =========================================================================
+    (function autoDetectWsUrl() {
+        const loc   = window.location;
+        const proto = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+        document.getElementById('wsUrl').value = `${proto}//${loc.host}/ws/realtime`;
+    })();
 
-        // =====================================================================
-        // UI Helpers
-        // =====================================================================
-        function setStatus(newState, text) {
-            state = newState;
-            const dot = document.getElementById('statusDot');
-            dot.className = 'status-dot ' + newState;
-            document.getElementById('statusText').textContent = text;
-        }
+    // =========================================================================
+    // UI helpers
+    // =========================================================================
+    function setStatus(newState, text) {
+        S.uiState = newState;
+        document.getElementById('statusDot').className  = 'status-dot ' + newState;
+        document.getElementById('statusText').textContent = text;
+    }
 
-        function addMessage(role, text) {
-            const panel = document.getElementById('transcripts');
-            const div = document.createElement('div');
-            div.className = 'message ' + role;
-            const roleName = role === 'user' ? 'You' : role === 'assistant' ? 'Assistant' : role;
-            div.innerHTML = `<span class="role">${roleName}:</span> ${text}`;
-            panel.appendChild(div);
-            panel.scrollTop = panel.scrollHeight;
-        }
+    function addMessage(role, text) {
+        const panel = document.getElementById('transcripts');
+        const div   = document.createElement('div');
+        div.className = 'message ' + role;
+        const label = role === 'user' ? 'You' : role === 'assistant' ? 'Assistant' : role;
+        div.innerHTML = `<span class="role">${label}:</span> ${escHtml(text)}`;
+        panel.appendChild(div);
+        panel.scrollTop = panel.scrollHeight;
+    }
 
-        // =====================================================================
-        // Audio Capture
-        // =====================================================================
-        async function startMicrophone() {
-            mediaStream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    sampleRate: SAMPLE_RATE,
-                    channelCount: 1,
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                },
-            });
+    function escHtml(s) {
+        return String(s)
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
 
-            audioContext = new (window.AudioContext || window.webkitAudioContext)({
-                sampleRate: SAMPLE_RATE,
-            });
+    function setBtns(connected) {
+        document.getElementById('btnConnect').disabled    =  connected;
+        document.getElementById('btnDisconnect').disabled = !connected;
+    }
 
-            const source = audioContext.createMediaStreamSource(mediaStream);
+    // =========================================================================
+    // Microphone capture
+    // =========================================================================
+    async function startMicrophone() {
+        // Do NOT request a specific sampleRate in getUserMedia.
+        // Requesting sampleRate: 16000 causes Chrome/Firefox to spin up an
+        // internal resampler that runs at a *different* rate than the default
+        // AudioContext, which triggers:
+        //   "Connecting AudioNodes from AudioContexts with different
+        //    sample-rate is currently not supported."
+        // Instead, let the OS open the mic at its native rate (typically
+        // 44100 or 48000 Hz) and resample to 16 kHz ourselves in the
+        // ScriptProcessor callback below.
+        S.mediaStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                channelCount:     1,
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl:  true,
+                // NO sampleRate constraint here — let hardware decide
+            },
+        });
 
-            // Use ScriptProcessorNode for raw PCM access
-            scriptProcessor = audioContext.createScriptProcessor(
-                1024, 1, 1
-            );
+        // Create AudioContext with NO sampleRate option so it matches the
+        // native hardware rate of the media stream exactly.
+        S.captureCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-            scriptProcessor.onaudioprocess = (e) => {
-                if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        // Read the actual rate the browser/OS chose (44100, 48000, etc.)
+        const ctxRate = S.captureCtx.sampleRate;
 
-                const inputData = e.inputBuffer.getChannelData(0);
-                // Convert float32 [-1,1] to int16
-                const pcm16 = new Int16Array(inputData.length);
-                for (let i = 0; i < inputData.length; i++) {
-                    const s = Math.max(-1, Math.min(1, inputData[i]));
-                    pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-                }
+        S.sourceNode = S.captureCtx.createMediaStreamSource(S.mediaStream);
 
-                // Base64 encode
-                const bytes = new Uint8Array(pcm16.buffer);
-                let binary = '';
-                for (let i = 0; i < bytes.length; i++) {
-                    binary += String.fromCharCode(bytes[i]);
-                }
-                const b64 = btoa(binary);
+        // SP_BUFFER_SIZE is a valid power-of-two → no "buffer size" error.
+        S.spNode = S.captureCtx.createScriptProcessor(SP_BUFFER_SIZE, 1, 1);
 
-                ws.send(JSON.stringify({
-                    type: 'audio_chunk',
-                    data: b64,
-                }));
-            };
+        S.spNode.onaudioprocess = (e) => {
+            if (!S.ws || S.ws.readyState !== WebSocket.OPEN) return;
 
-            source.connect(scriptProcessor);
-            scriptProcessor.connect(audioContext.destination);
-        }
+            const raw = e.inputBuffer.getChannelData(0); // Float32 @ ctxRate
 
-        function stopMicrophone() {
-            if (scriptProcessor) {
-                scriptProcessor.disconnect();
-                scriptProcessor = null;
-            }
-            if (mediaStream) {
-                mediaStream.getTracks().forEach(t => t.stop());
-                mediaStream = null;
-            }
-            if (audioContext) {
-                audioContext.close();
-                audioContext = null;
-            }
-        }
+            // Resample from hardware rate to 16 kHz (no-op if already 16 kHz).
+            const resampled = linearResample(raw, ctxRate, CAPTURE_SAMPLE_RATE);
 
-        // =====================================================================
-        // Audio Playback
-        // =====================================================================
-        function playAudioChunk(b64Data) {
-            if (!audioContext) return;
+            // Accumulate into sendBuf — do NOT send on every callback.
+            // ScriptProcessor fires ~12×/sec at 48 kHz; sending each frame
+            // individually floods the server queue (asr_audio_queue_full).
+            S.sendBuf.push(resampled);
+            S.sendBufLen += resampled.length;
 
-            // Decode base64 to Int16 PCM
-            const binary = atob(b64Data);
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) {
-                bytes[i] = binary.charCodeAt(i);
-            }
-            const pcm16 = new Int16Array(bytes.buffer);
-
-            // Convert to float32 for Web Audio
-            const float32 = new Float32Array(pcm16.length);
-            for (let i = 0; i < pcm16.length; i++) {
-                float32[i] = pcm16[i] / 32768.0;
-            }
-
-            playbackQueue.push(float32);
-            if (!isPlaying) {
-                drainPlaybackQueue();
-            }
-        }
-
-        function drainPlaybackQueue() {
-            if (playbackQueue.length === 0 || !audioContext) {
-                isPlaying = false;
-                return;
-            }
-
-            isPlaying = true;
-            const samples = playbackQueue.shift();
-
-            const buffer = audioContext.createBuffer(1, samples.length, SAMPLE_RATE);
-            buffer.getChannelData(0).set(samples);
-
-            const source = audioContext.createBufferSource();
-            source.buffer = buffer;
-            source.connect(audioContext.destination);
-            source.onended = () => drainPlaybackQueue();
-            source.start();
-        }
-
-        // =====================================================================
-        // Visualizer
-        // =====================================================================
-        function setupVisualizer() {
-            const canvas = document.getElementById('visualizer');
-            const ctx = canvas.getContext('2d');
-            canvas.width = canvas.offsetWidth * 2;
-            canvas.height = canvas.offsetHeight * 2;
-
-            function draw() {
-                requestAnimationFrame(draw);
-
-                ctx.fillStyle = '#1e293b';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                if (state === 'listening' || state === 'speaking') {
-                    const bars = 40;
-                    const barWidth = canvas.width / bars;
-                    for (let i = 0; i < bars; i++) {
-                        const h = Math.random() * canvas.height * (state === 'speaking' ? 0.8 : 0.3);
-                        const color = state === 'speaking' ? '#f59e0b' : '#38bdf8';
-                        ctx.fillStyle = color;
-                        ctx.fillRect(i * barWidth + 2, canvas.height - h, barWidth - 4, h);
+            // Only send when we have a full 200 ms chunk (3200 samples @ 16 kHz).
+            while (S.sendBufLen >= SEND_CHUNK_SAMPLES) {
+                // Flatten exactly SEND_CHUNK_SAMPLES from the front of the buffer.
+                const flat = new Float32Array(SEND_CHUNK_SAMPLES);
+                let written = 0;
+                while (written < SEND_CHUNK_SAMPLES) {
+                    const piece  = S.sendBuf[0];
+                    const needed = SEND_CHUNK_SAMPLES - written;
+                    if (piece.length <= needed) {
+                        flat.set(piece, written);
+                        written += piece.length;
+                        S.sendBuf.shift();
+                        S.sendBufLen -= piece.length;
+                    } else {
+                        flat.set(piece.subarray(0, needed), written);
+                        S.sendBuf[0] = piece.subarray(needed);
+                        S.sendBufLen -= needed;
+                        written = SEND_CHUNK_SAMPLES;
                     }
                 }
+
+                // Float32 → Int16 PCM → base64 → send
+                const pcm16 = floatToPcm16(flat);
+                const b64   = arrayBufferToBase64(pcm16.buffer);
+                S.ws.send(JSON.stringify({ type: 'audio_chunk', data: b64 }));
             }
-            draw();
+        };
+
+        S.sourceNode.connect(S.spNode);
+        // FIX: Do NOT connect spNode to destination — we do not want capture
+        //      audio echoing through speakers.  ScriptProcessorNode only needs
+        //      a downstream node to keep the audio graph alive, so we use a
+        //      silent GainNode that IS connected to destination.
+        const silentGain = S.captureCtx.createGain();
+        silentGain.gain.value = 0;
+        S.spNode.connect(silentGain);
+        silentGain.connect(S.captureCtx.destination);
+    }
+
+    // =========================================================================
+    // Microphone teardown
+    //
+    // FIX: Guard every step — any node might already be disconnected/null.
+    //      Close AudioContext only once (check .state !== 'closed').
+    // =========================================================================
+    async function stopMicrophone() {
+        try { S.spNode    && S.spNode.disconnect();    } catch (_) {}
+        try { S.sourceNode && S.sourceNode.disconnect(); } catch (_) {}
+        S.spNode     = null;
+        S.sourceNode = null;
+        S.sendBuf    = [];
+        S.sendBufLen = 0;
+
+        if (S.mediaStream) {
+            S.mediaStream.getTracks().forEach(t => { try { t.stop(); } catch (_) {} });
+            S.mediaStream = null;
         }
 
-        // =====================================================================
-        // WebSocket Connection
-        // =====================================================================
-        async function connect() {
-            const urlInput = document.getElementById('wsUrl').value.trim();
-            const apiKey = document.getElementById('apiKey').value.trim();
+        // FIX: Only close if not already closing/closed
+        if (S.captureCtx && S.captureCtx.state !== 'closed') {
+            try { await S.captureCtx.close(); } catch (_) {}
+        }
+        S.captureCtx = null;
+    }
 
-            let wsUrl = urlInput;
-            if (apiKey) {
-                const sep = wsUrl.includes('?') ? '&' : '?';
-                wsUrl += `${sep}api_key=${encodeURIComponent(apiKey)}`;
+    // =========================================================================
+    // Audio playback  (separate AudioContext avoids sample-rate conflicts)
+    //
+    // FIX: Use a dedicated AudioContext for playback at PLAYBACK_SAMPLE_RATE.
+    //      Chunks are scheduled with precise currentTime so they are gapless
+    //      rather than queued through a JS array with drainPlaybackQueue logic
+    //      that can stall if onended fires late.
+    // =========================================================================
+    function ensurePlaybackCtx() {
+        if (!S.playbackCtx || S.playbackCtx.state === 'closed') {
+            S.playbackCtx    = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: PLAYBACK_SAMPLE_RATE,
+            });
+            S.playScheduleAt = S.playbackCtx.currentTime;
+        }
+        // Browser may suspend AudioContext on page-load; resume on first audio
+        if (S.playbackCtx.state === 'suspended') {
+            S.playbackCtx.resume().catch(() => {});
+        }
+    }
+
+    function playAudioChunk(b64Data) {
+        ensurePlaybackCtx();
+
+        const bytes  = base64ToUint8Array(b64Data);
+        const pcm16  = new Int16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 2);
+        const float32 = pcm16ToFloat(pcm16);
+
+        const buffer = S.playbackCtx.createBuffer(1, float32.length, PLAYBACK_SAMPLE_RATE);
+        buffer.getChannelData(0).set(float32);
+
+        const src = S.playbackCtx.createBufferSource();
+        src.buffer = buffer;
+        src.connect(S.playbackCtx.destination);
+
+        // Schedule gapless: start at the end of the previously scheduled chunk
+        const startAt = Math.max(S.playScheduleAt, S.playbackCtx.currentTime);
+        src.start(startAt);
+        S.playScheduleAt = startAt + buffer.duration;
+    }
+
+    async function stopPlayback() {
+        S.playScheduleAt = 0;
+        if (S.playbackCtx && S.playbackCtx.state !== 'closed') {
+            try { await S.playbackCtx.close(); } catch (_) {}
+        }
+        S.playbackCtx = null;
+    }
+
+    // =========================================================================
+    // Visualizer
+    // =========================================================================
+    function startVisualizer() {
+        const canvas = document.getElementById('visualizer');
+        const ctx    = canvas.getContext('2d');
+
+        // FIX: Set canvas pixel dimensions to match its CSS size * devicePixelRatio
+        function resize() {
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width  = canvas.offsetWidth  * dpr;
+            canvas.height = canvas.offsetHeight * dpr;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        function draw() {
+            S.visualRaf = requestAnimationFrame(draw);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#0e1620';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const active = (S.uiState === 'listening' || S.uiState === 'speaking');
+            if (!active) return;
+
+            const bars     = 48;
+            const barW     = canvas.width / bars;
+            const isSpeaking = S.uiState === 'speaking';
+            const maxH     = canvas.height * (isSpeaking ? 0.85 : 0.35);
+            const color    = isSpeaking ? '#ffb700' : '#00d4ff';
+
+            for (let i = 0; i < bars; i++) {
+                const h = Math.random() * maxH;
+                ctx.fillStyle = color;
+                ctx.globalAlpha = 0.5 + Math.random() * 0.5;
+                ctx.fillRect(i * barW + 2, canvas.height - h, barW - 4, h);
             }
+            ctx.globalAlpha = 1;
+        }
+        draw();
+    }
 
-            document.getElementById('btnConnect').disabled = true;
-            document.getElementById('btnDisconnect').disabled = false;
-            setStatus('connected', 'Connecting...');
-            addMessage('system', 'Connecting to server...');
+    function stopVisualizer() {
+        if (S.visualRaf !== null) {
+            cancelAnimationFrame(S.visualRaf);
+            S.visualRaf = null;
+        }
+    }
 
-            try {
-                await startMicrophone();
-                setupVisualizer();
-            } catch (err) {
-                setStatus('error', 'Microphone error');
-                addMessage('error', 'Microphone access denied: ' + err.message);
-                document.getElementById('btnConnect').disabled = false;
-                document.getElementById('btnDisconnect').disabled = true;
-                return;
-            }
+    // =========================================================================
+    // WebSocket
+    // =========================================================================
+    async function connect() {
+        const urlInput = document.getElementById('wsUrl').value.trim();
+        const apiKey   = document.getElementById('apiKey').value.trim();
 
-            ws = new WebSocket(wsUrl);
+        if (!urlInput) {
+            addMessage('error', 'Please enter a WebSocket URL.');
+            return;
+        }
 
-            ws.onopen = () => {
-                setStatus('listening', 'Listening...');
-                addMessage('system', 'Connected. Speak into your microphone.');
-            };
+        let wsUrl = urlInput;
+        if (apiKey) {
+            wsUrl += (wsUrl.includes('?') ? '&' : '?') + 'api_key=' + encodeURIComponent(apiKey);
+        }
 
-            ws.onmessage = (event) => {
-                const msg = JSON.parse(event.data);
+        setBtns(true);
+        setStatus('connected', 'Connecting...');
+        addMessage('system', 'Connecting to server…');
 
-                switch (msg.type) {
-                    case 'audio_chunk':
-                        playAudioChunk(msg.data);
-                        break;
+        // Microphone first — fast-fail before opening the socket
+        try {
+            await startMicrophone();
+        } catch (err) {
+            addMessage('error', 'Microphone access denied: ' + err.message);
+            setStatus('error', 'Mic error');
+            setBtns(false);
+            return;
+        }
 
-                    case 'partial_transcript':
-                        // Update existing or add new
-                        addMessage('system', `[partial] ${msg.text}`);
-                        break;
+        startVisualizer();
 
-                    case 'final_transcript':
+        // FIX: Create playback context lazily on first chunk to avoid
+        //      "AudioContext was not allowed to start" policy errors.
+        //      (ensurePlaybackCtx() is called inside playAudioChunk)
+
+        S.ws = new WebSocket(wsUrl);
+
+        S.ws.onopen = () => {
+            setStatus('listening', 'Listening…');
+            addMessage('system', 'Connected. Speak into your microphone.');
+        };
+
+        S.ws.onmessage = (event) => {
+            let msg;
+            try { msg = JSON.parse(event.data); }
+            catch { return; }                          // ignore non-JSON frames
+
+            switch (msg.type) {
+                case 'audio_chunk':
+                    setStatus('speaking', 'Speaking…');
+                    playAudioChunk(msg.data);
+                    break;
+
+                case 'partial_transcript':
+                    // Overwrite the last partial (remove & re-add)
+                    {
+                        const panel = document.getElementById('transcripts');
+                        const prev  = panel.querySelector('.partial');
+                        if (prev) panel.removeChild(prev);
+                        const div = document.createElement('div');
+                        div.className = 'message system partial';
+                        div.innerHTML = `<span class="role">…</span> ${escHtml(msg.text)}`;
+                        panel.appendChild(div);
+                        panel.scrollTop = panel.scrollHeight;
+                    }
+                    break;
+
+                case 'final_transcript':
+                    {
+                        // Remove any lingering partial
+                        const panel = document.getElementById('transcripts');
+                        const prev  = panel.querySelector('.partial');
+                        if (prev) panel.removeChild(prev);
                         addMessage('user', msg.text);
-                        break;
+                    }
+                    break;
 
-                    case 'state_change':
-                        const stateMap = {
-                            'LISTENING': ['listening', 'Listening...'],
-                            'THINKING': ['thinking', 'Thinking...'],
-                            'SPEAKING': ['speaking', 'Speaking...'],
-                            'INTERRUPTED': ['listening', 'Interrupted - Listening...'],
-                        };
-                        const s = stateMap[msg.state];
-                        if (s) setStatus(s[0], s[1]);
-                        break;
+                case 'assistant_text':
+                    addMessage('assistant', msg.text);
+                    break;
 
-                    case 'error':
-                        addMessage('error', msg.message);
-                        break;
-
-                    case 'pong':
-                        break;
+                case 'state_change': {
+                    const MAP = {
+                        LISTENING:   ['listening', 'Listening…'],
+                        THINKING:    ['thinking',  'Thinking…'],
+                        SPEAKING:    ['speaking',  'Speaking…'],
+                        INTERRUPTED: ['listening', 'Interrupted — Listening…'],
+                    };
+                    const s = MAP[msg.state];
+                    if (s) setStatus(s[0], s[1]);
+                    break;
                 }
-            };
 
-            ws.onclose = (e) => {
-                setStatus('disconnected', `Disconnected (${e.code})`);
-                addMessage('system', `Disconnected: ${e.reason || 'connection closed'}`);
-                cleanup();
-            };
+                case 'session_created':
+                    document.getElementById('sessionInfo').textContent =
+                        msg.session_id ? 'id: ' + msg.session_id.slice(0, 8) : '';
+                    break;
 
-            ws.onerror = (err) => {
-                setStatus('error', 'Connection error');
-                addMessage('error', 'WebSocket error occurred');
-            };
-        }
+                case 'error':
+                    addMessage('error', msg.message || 'Unknown server error');
+                    break;
 
-        function disconnect() {
-            if (ws) {
-                ws.send(JSON.stringify({ type: 'stop' }));
-                ws.close();
+                case 'pong':
+                    break; // keep-alive reply — no action needed
             }
+        };
+
+        S.ws.onclose = (e) => {
+            setStatus('disconnected', `Disconnected (${e.code})`);
+            addMessage('system', `Disconnected: ${e.reason || 'connection closed'}`);
             cleanup();
+        };
+
+        S.ws.onerror = () => {
+            // onerror is always followed by onclose, so we just log here
+            addMessage('error', 'WebSocket error — see console for details');
+        };
+    }
+
+    function disconnect() {
+        if (S.ws) {
+            // FIX: Check readyState before sending — socket might already be closing
+            if (S.ws.readyState === WebSocket.OPEN) {
+                try { S.ws.send(JSON.stringify({ type: 'stop' })); } catch (_) {}
+            }
+            // FIX: Only close if not already closed/closing
+            if (S.ws.readyState < WebSocket.CLOSING) {
+                S.ws.close(1000, 'User disconnected');
+            }
+        }
+        // cleanup() will be called via onclose; call directly in case socket
+        // was never opened or is already closed.
+        cleanup();
+    }
+
+    // =========================================================================
+    // Cleanup  — idempotent, safe to call multiple times
+    // =========================================================================
+    function cleanup() {
+        if (S.cleanupInFlight) return;   // FIX: prevent re-entrant double-cleanup
+        S.cleanupInFlight = true;
+
+        // Nullify ws first so no more messages are processed
+        const wsRef = S.ws;
+        S.ws = null;
+        if (wsRef && wsRef.readyState < WebSocket.CLOSING) {
+            try { wsRef.close(); } catch (_) {}
         }
 
-        function cleanup() {
-            stopMicrophone();
-            playbackQueue = [];
-            isPlaying = false;
-            ws = null;
-            document.getElementById('btnConnect').disabled = false;
-            document.getElementById('btnDisconnect').disabled = true;
+        stopMicrophone();   // async but we don't await — fire-and-forget is fine here
+        stopPlayback();
+        stopVisualizer();
+
+        setStatus('disconnected', 'Disconnected');
+        document.getElementById('sessionInfo').textContent = '';
+        setBtns(false);
+
+        S.cleanupInFlight = false;
+    }
+
+    // =========================================================================
+    // Audio utility helpers
+    // =========================================================================
+    function floatToPcm16(float32) {
+        const out = new Int16Array(float32.length);
+        for (let i = 0; i < float32.length; i++) {
+            const s  = Math.max(-1, Math.min(1, float32[i]));
+            out[i]   = s < 0 ? s * 0x8000 : s * 0x7FFF;
         }
+        return out;
+    }
+
+    function pcm16ToFloat(pcm16) {
+        const out = new Float32Array(pcm16.length);
+        for (let i = 0; i < pcm16.length; i++) {
+            out[i] = pcm16[i] / 32768.0;
+        }
+        return out;
+    }
+
+    /** Linear resampler — good enough for speech, avoids heavy DSP dependency.
+     *  Returns src unchanged (no copy) when rates already match. */
+    function linearResample(src, srcRate, dstRate) {
+        if (srcRate === dstRate) return src;
+        const ratio = srcRate / dstRate;
+        const len   = Math.round(src.length / ratio);
+        const dst   = new Float32Array(len);
+        for (let i = 0; i < len; i++) {
+            const pos = i * ratio;
+            const lo  = Math.floor(pos);
+            const hi  = Math.min(lo + 1, src.length - 1);
+            const t   = pos - lo;
+            dst[i]    = src[lo] * (1 - t) + src[hi] * t;
+        }
+        return dst;
+    }
+
+    function arrayBufferToBase64(buffer) {
+        const bytes  = new Uint8Array(buffer);
+        let   binary = '';
+        // FIX: chunk the call to avoid "maximum call stack" on large buffers
+        const CHUNK  = 0x8000;
+        for (let i = 0; i < bytes.length; i += CHUNK) {
+            binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+        }
+        return btoa(binary);
+    }
+
+    function base64ToUint8Array(b64) {
+        const binary = atob(b64);
+        const bytes  = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes;
+    }
     </script>
 </body>
 </html>

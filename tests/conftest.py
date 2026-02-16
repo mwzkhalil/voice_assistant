@@ -100,7 +100,14 @@ def test_settings() -> AppSettings:
 
 @pytest.fixture
 def mock_redis():
-    """Create a mock Redis client."""
+    """Create a mock Redis client.
+
+    FIX: redis.lock() is a synchronous call that *returns* a lock object.
+    Only lock.acquire() / lock.release() are async.
+    Using AsyncMock for .lock itself caused it to return a coroutine instead
+    of a lock object, so calling .acquire() on the coroutine raised:
+        AttributeError: 'coroutine' object has no attribute 'acquire'
+    """
     mock = AsyncMock()
     mock.ping.return_value = True
     mock.get.return_value = None
@@ -109,11 +116,18 @@ def mock_redis():
     mock.exists.return_value = False
     mock.scan.return_value = (0, [])
 
-    # Mock lock
-    lock_mock = AsyncMock()
-    lock_mock.acquire.return_value = True
-    lock_mock.release.return_value = None
-    mock.lock.return_value = lock_mock
+    # Build a proper lock mock:
+    #   - lock.acquire() / release() are async  → AsyncMock
+    #   - client.lock() itself is sync          → MagicMock(return_value=...)
+    lock_mock = MagicMock()
+    lock_mock.acquire = AsyncMock(return_value=True)
+    lock_mock.release = AsyncMock(return_value=None)
+    # Support use as an async context manager: `async with client.lock(...)`
+    lock_mock.__aenter__ = AsyncMock(return_value=lock_mock)
+    lock_mock.__aexit__ = AsyncMock(return_value=False)
+
+    # MagicMock (not AsyncMock) so calling it returns lock_mock synchronously
+    mock.lock = MagicMock(return_value=lock_mock)
 
     return mock
 
@@ -178,13 +192,22 @@ def mock_llm_service():
 
 @pytest.fixture
 def mock_vad_service():
-    """Create a mock VAD service."""
-    from services.vad_service import VADEvent, VADResult
+    """Create a mock VAD service.
 
-    tracker_mock = MagicMock()
-    tracker_mock.is_speaking = False
-    tracker_mock.reset = MagicMock()
-    tracker_mock.process_frame = MagicMock(return_value=VADResult(
+    FIX: importing from services.vad_service at fixture-definition time caused
+    ModuleNotFoundError when webrtcvad is not installed, because the import
+    runs even for tests that never use this fixture.
+
+    Instead we mock out the entire vad_service module so the real webrtcvad
+    C-extension is never imported during the test run.
+    """
+    # Stub the two named types the fixture previously imported
+    VADEvent = MagicMock()
+    VADEvent.SILENCE = "SILENCE"
+    VADEvent.SPEECH_START = "SPEECH_START"
+    VADEvent.SPEECH_END = "SPEECH_END"
+
+    VADResult = MagicMock(return_value=MagicMock(
         event=VADEvent.SILENCE,
         is_speech=False,
         speech_duration_ms=0,
@@ -193,8 +216,13 @@ def mock_vad_service():
         should_finalize=False,
     ))
 
+    tracker_mock = MagicMock()
+    tracker_mock.is_speaking = False
+    tracker_mock.reset = MagicMock()
+    tracker_mock.process_frame = MagicMock(return_value=VADResult())
+
     mock = MagicMock()
     mock.create_tracker.return_value = tracker_mock
-    mock.frame_size_bytes = 960  # 30ms at 16kHz
+    mock.frame_size_bytes = 960   # 30 ms at 16 kHz
     mock.frame_duration_ms = 30
     return mock

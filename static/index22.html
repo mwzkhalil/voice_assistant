@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Assistant - Realtime Client</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: #38bdf8;
+        }
+
+        .subtitle {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin-bottom: 2rem;
+        }
+
+        .config-panel {
+            width: 100%;
+            max-width: 600px;
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .config-panel label {
+            display: block;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-bottom: 0.25rem;
+        }
+
+        .config-panel input {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            color: #e2e8f0;
+            font-size: 0.9rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .config-panel input:focus {
+            outline: none;
+            border-color: #38bdf8;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+
+        button {
+            padding: 0.75rem 2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        #btnConnect {
+            background: #22c55e;
+            color: #0f172a;
+        }
+
+        #btnConnect:hover:not(:disabled) {
+            background: #16a34a;
+        }
+
+        #btnDisconnect {
+            background: #ef4444;
+            color: white;
+        }
+
+        #btnDisconnect:hover:not(:disabled) {
+            background: #dc2626;
+        }
+
+        .status-bar {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            background: #1e293b;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            font-size: 0.85rem;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #64748b;
+        }
+
+        .status-dot.connected { background: #22c55e; }
+        .status-dot.listening { background: #38bdf8; animation: pulse 1.5s infinite; }
+        .status-dot.speaking  { background: #f59e0b; animation: pulse 0.8s infinite; }
+        .status-dot.thinking  { background: #a78bfa; animation: pulse 1s infinite; }
+        .status-dot.error     { background: #ef4444; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .visualizer {
+            width: 100%;
+            max-width: 600px;
+            height: 80px;
+            background: #1e293b;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+        }
+
+        .visualizer canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .transcript-panel {
+            width: 100%;
+            max-width: 600px;
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 1.5rem;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .transcript-panel h3 {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 0.5rem;
+        }
+
+        .message {
+            padding: 0.5rem 0;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            border-bottom: 1px solid #1e293b;
+        }
+
+        .message.user { color: #38bdf8; }
+        .message.assistant { color: #22c55e; }
+        .message.system { color: #64748b; font-style: italic; font-size: 0.8rem; }
+        .message.error { color: #ef4444; }
+
+        .message .role {
+            font-weight: 600;
+            display: inline-block;
+            min-width: 70px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Voice Assistant - Urdu</h1>
+    <p class="subtitle"> Realtime Streaming Client</p>
+
+    <div class="config-panel">
+        <label for="wsUrl">WebSocket URL</label>
+        <input type="text" id="wsUrl" value="" placeholder="wss://yourdomain.com/ws/realtime?api_key=YOUR_KEY">
+        <label for="apiKey">API Key</label>
+        <input type="text" id="apiKey" value="" placeholder="Enter API key">
+    </div>
+
+    <div class="controls">
+        <button id="btnConnect" onclick="connect()">Connect & Start</button>
+        <button id="btnDisconnect" onclick="disconnect()" disabled>Disconnect</button>
+    </div>
+
+    <div class="status-bar">
+        <div class="status-indicator">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">Disconnected</span>
+        </div>
+        <span id="sessionInfo"></span>
+    </div>
+
+    <div class="visualizer">
+        <canvas id="visualizer"></canvas>
+    </div>
+
+    <div class="transcript-panel" id="transcripts">
+        <h3>Conversation</h3>
+    </div>
+
+    <script>
+        // =====================================================================
+        // Configuration
+        // =====================================================================
+        const SAMPLE_RATE = 16000;
+        const FRAME_DURATION_MS = 30;
+        const FRAME_SIZE = SAMPLE_RATE * FRAME_DURATION_MS / 1000;
+
+        // =====================================================================
+        // State
+        // =====================================================================
+        let ws = null;
+        let audioContext = null;
+        let mediaStream = null;
+        let scriptProcessor = null;
+        let playbackQueue = [];
+        let isPlaying = false;
+        let state = 'disconnected';
+
+        // Auto-detect WebSocket URL
+        (function() {
+            const loc = window.location;
+            const proto = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+            document.getElementById('wsUrl').value = `${proto}//${loc.host}/ws/realtime`;
+        })();
+
+        // =====================================================================
+        // UI Helpers
+        // =====================================================================
+        function setStatus(newState, text) {
+            state = newState;
+            const dot = document.getElementById('statusDot');
+            dot.className = 'status-dot ' + newState;
+            document.getElementById('statusText').textContent = text;
+        }
+
+        function addMessage(role, text) {
+            const panel = document.getElementById('transcripts');
+            const div = document.createElement('div');
+            div.className = 'message ' + role;
+            const roleName = role === 'user' ? 'You' : role === 'assistant' ? 'Assistant' : role;
+            div.innerHTML = `<span class="role">${roleName}:</span> ${text}`;
+            panel.appendChild(div);
+            panel.scrollTop = panel.scrollHeight;
+        }
+
+        // =====================================================================
+        // Audio Capture
+        // =====================================================================
+       async function startMicrophone() {
+    // Create AudioContext first
+    audioContext = new (window.AudioContext || window.webkitAudioContext)({
+        sampleRate: SAMPLE_RATE,
+    });
+
+    // Request microphone with matching sample rate
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: audioContext.sampleRate, // <- use the context sampleRate
+        },
+    });
+
+    const source = audioContext.createMediaStreamSource(mediaStream);
+
+    // ScriptProcessorNode (or AudioWorkletNode)
+    scriptProcessor = audioContext.createScriptProcessor(1024, 1, 1);
+
+    scriptProcessor.onaudioprocess = (e) => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+        const inputData = e.inputBuffer.getChannelData(0);
+        const pcm16 = new Int16Array(inputData.length);
+        for (let i = 0; i < inputData.length; i++) {
+            const s = Math.max(-1, Math.min(1, inputData[i]));
+            pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+
+        const bytes = new Uint8Array(pcm16.buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        const b64 = btoa(binary);
+
+        ws.send(JSON.stringify({ type: 'audio_chunk', data: b64 }));
+    };
+
+    source.connect(scriptProcessor);
+    scriptProcessor.connect(audioContext.destination);
+}
+
+        function stopMicrophone() {
+            if (scriptProcessor) {
+                scriptProcessor.disconnect();
+                scriptProcessor = null;
+            }
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(t => t.stop());
+                mediaStream = null;
+            }
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+        }
+
+        // =====================================================================
+        // Audio Playback
+        // =====================================================================
+        function playAudioChunk(b64Data) {
+            if (!audioContext) return;
+
+            // Decode base64 to Int16 PCM
+            const binary = atob(b64Data);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            const pcm16 = new Int16Array(bytes.buffer);
+
+            // Convert to float32 for Web Audio
+            const float32 = new Float32Array(pcm16.length);
+            for (let i = 0; i < pcm16.length; i++) {
+                float32[i] = pcm16[i] / 32768.0;
+            }
+
+            playbackQueue.push(float32);
+            if (!isPlaying) {
+                drainPlaybackQueue();
+            }
+        }
+
+        function drainPlaybackQueue() {
+            if (playbackQueue.length === 0 || !audioContext) {
+                isPlaying = false;
+                return;
+            }
+
+            isPlaying = true;
+            const samples = playbackQueue.shift();
+
+            const buffer = audioContext.createBuffer(1, samples.length, SAMPLE_RATE);
+            buffer.getChannelData(0).set(samples);
+
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioContext.destination);
+            source.onended = () => drainPlaybackQueue();
+            source.start();
+        }
+
+        // =====================================================================
+        // Visualizer
+        // =====================================================================
+        function setupVisualizer() {
+            const canvas = document.getElementById('visualizer');
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth * 2;
+            canvas.height = canvas.offsetHeight * 2;
+
+            function draw() {
+                requestAnimationFrame(draw);
+
+                ctx.fillStyle = '#1e293b';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                if (state === 'listening' || state === 'speaking') {
+                    const bars = 40;
+                    const barWidth = canvas.width / bars;
+                    for (let i = 0; i < bars; i++) {
+                        const h = Math.random() * canvas.height * (state === 'speaking' ? 0.8 : 0.3);
+                        const color = state === 'speaking' ? '#f59e0b' : '#38bdf8';
+                        ctx.fillStyle = color;
+                        ctx.fillRect(i * barWidth + 2, canvas.height - h, barWidth - 4, h);
+                    }
+                }
+            }
+            draw();
+        }
+
+        // =====================================================================
+        // WebSocket Connection
+        // =====================================================================
+        async function connect() {
+            const urlInput = document.getElementById('wsUrl').value.trim();
+            const apiKey = document.getElementById('apiKey').value.trim();
+
+            let wsUrl = urlInput;
+            if (apiKey) {
+                const sep = wsUrl.includes('?') ? '&' : '?';
+                wsUrl += `${sep}api_key=${encodeURIComponent(apiKey)}`;
+            }
+
+            document.getElementById('btnConnect').disabled = true;
+            document.getElementById('btnDisconnect').disabled = false;
+            setStatus('connected', 'Connecting...');
+            addMessage('system', 'Connecting to server...');
+
+            try {
+                await startMicrophone();
+                setupVisualizer();
+            } catch (err) {
+                setStatus('error', 'Microphone error');
+                addMessage('error', 'Microphone access denied: ' + err.message);
+                document.getElementById('btnConnect').disabled = false;
+                document.getElementById('btnDisconnect').disabled = true;
+                return;
+            }
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                setStatus('listening', 'Listening...');
+                addMessage('system', 'Connected. Speak into your microphone.');
+            };
+
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+
+                switch (msg.type) {
+                    case 'audio_chunk':
+                        playAudioChunk(msg.data);
+                        break;
+
+                    case 'partial_transcript':
+                        // Update existing or add new
+                        addMessage('system', `[partial] ${msg.text}`);
+                        break;
+
+                    case 'final_transcript':
+                        addMessage('user', msg.text);
+                        break;
+
+                    case 'state_change':
+                        const stateMap = {
+                            'LISTENING': ['listening', 'Listening...'],
+                            'THINKING': ['thinking', 'Thinking...'],
+                            'SPEAKING': ['speaking', 'Speaking...'],
+                            'INTERRUPTED': ['listening', 'Interrupted - Listening...'],
+                        };
+                        const s = stateMap[msg.state];
+                        if (s) setStatus(s[0], s[1]);
+                        break;
+
+                    case 'error':
+                        addMessage('error', msg.message);
+                        break;
+
+                    case 'pong':
+                        break;
+                }
+            };
+
+            ws.onclose = (e) => {
+                setStatus('disconnected', `Disconnected (${e.code})`);
+                addMessage('system', `Disconnected: ${e.reason || 'connection closed'}`);
+                cleanup();
+            };
+
+            ws.onerror = (err) => {
+                setStatus('error', 'Connection error');
+                addMessage('error', 'WebSocket error occurred');
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.send(JSON.stringify({ type: 'stop' }));
+                ws.close();
+            }
+            cleanup();
+        }
+
+        function cleanup() {
+            stopMicrophone();
+            playbackQueue = [];
+            isPlaying = false;
+            ws = null;
+            document.getElementById('btnConnect').disabled = false;
+            document.getElementById('btnDisconnect').disabled = true;
+        }
+    </script>
+</body>
+</html>

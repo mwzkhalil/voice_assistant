@@ -41,12 +41,15 @@ def mock_redis_client():
     client.delete.return_value = 1
 
     # Mock lock
-    lock_mock = AsyncMock()
-    lock_mock.acquire.return_value = True
-    lock_mock.release.return_value = None
+    # FIX: lock_mock must be MagicMock (not AsyncMock).
+    # client.lock() is a sync call — AsyncMock makes it return a coroutine,
+    # so lock.acquire() raises: AttributeError: 'coroutine' has no 'acquire'.
+    lock_mock = MagicMock()
+    lock_mock.acquire = AsyncMock(return_value=True)
+    lock_mock.release = AsyncMock(return_value=None)
     lock_mock.__aenter__ = AsyncMock(return_value=lock_mock)
-    lock_mock.__aexit__ = AsyncMock(return_value=None)
-    client.lock.return_value = lock_mock
+    lock_mock.__aexit__ = AsyncMock(return_value=False)
+    client.lock = MagicMock(return_value=lock_mock)
 
     return client
 
